@@ -35,7 +35,8 @@ from google_cloud_handler import GoogleCloudHandler
 
 INT_TO_NAME = {
     0: "zero", 1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 
-    7: "seven", 8: "eight", 9: "nine", 10: "ten", 11: "eleven", 12: "twelve"
+    7: "seven", 8: "eight", 9: "nine", 10: "ten", 11: "eleven", 12: "twelve",
+    13: "thirteen", 14: "fourteen", 15: "fifteen"
 } 
 
 
@@ -84,8 +85,14 @@ def selfplay(args):
     else:
         agent_in_dim = tuple([x for x in agent_in_dim[0]])
 
-    num_train_partners = len(load_json_list(
-            args.train_test_splits)[args.split_index]["train"])
+    if args.cosca:
+        num_train_conventions = len(load_json_list(
+                args.train_test_splits)[args.split_index]["train"])
+        train_partners = load_json_list(args.train_partner_models)
+        num_train_partners = len(train_partners) * num_train_conventions
+    else:
+        num_train_partners = len(load_json_list(
+                args.train_test_splits)[args.split_index]["train"])
 
     if args.shuffle_color == 1:
         num_train_partners = num_train_partners * 120
@@ -179,17 +186,26 @@ def selfplay(args):
             args.train_partner_sad_legacy, 
             args.train_partner_iql_legacy, 
             "train")
+
     if args.test_partner_models != "None":
-        test_partners = load_partner_agents(
-                args, 
-                args.test_partner_models, 
-                args.test_partner_sad_legacy, 
-                args.test_partner_iql_legacy, 
-                "test")
+        if args.cosca:
+            test_partners = train_partners
+            val_partners = train_partners
+        else:
+            test_partners = load_partner_agents(
+                    args, 
+                    args.test_partner_models, 
+                    args.test_partner_sad_legacy, 
+                    args.test_partner_iql_legacy, 
+                    "test")
     else: 
         test_partners = None 
 
-    convention = load_json_list(args.convention)
+    all_conventions = load_json_list(args.conventions)
+    convention_splits = load_json_list(
+            args.train_test_splits)[args.split_index]
+    train_conventions = [all_conventions[i] for i in convention_splits["train"]]
+    test_conventions = [all_conventions[i] for i in convention_splits["test"]]
 
     convention_act_override = [0, args.convention_act_override]
     use_experience = [1, 1 - args.static_partner]
@@ -213,7 +229,7 @@ def selfplay(args):
         args.off_belief, # off_belief
         belief_model, # belief_model
         belief_config, # belief_cfg
-        convention, # convention
+        train_conventions, # convention
         convention_act_override, # convention_act_overrided
         args.convention_fict_act_override, # convention_fic_act_override
         train_partners, # partners
@@ -226,7 +242,8 @@ def selfplay(args):
         num_parameters=args.num_parameters, # num_parameters
         num_train_partners=num_train_partners, # num_train_partners
         dist_shuffle_colour=args.dist_shuffle_colour, # dist_shuffle_colour
-        permutation_distribution=permutation_distribution
+        permutation_distribution=permutation_distribution,
+        shuffle_convention=args.cosca
     )
 
     context, threads = create_threads(
@@ -246,13 +263,11 @@ def selfplay(args):
         )
         gc_handler.assert_directory_doesnt_exist()
 
-
     act_group.start()
     context.start()
     while replay_buffer.size() < args.burn_in_frames:
         print("warming up replay buffer:", replay_buffer.size())
         time.sleep(1)
-
 
     print("Success, Done")
     print("=======================")
@@ -352,7 +367,7 @@ def selfplay(args):
             eval_agent,
             epoch,
             0, 
-            convention,
+            test_conventions,
             convention_act_override,
             train_partners,
             test_partners,
@@ -619,18 +634,24 @@ def load_json_list(path):
 
 
 def load_partner_agents(args, partner_models, sad_legacy, iql_legacy, partner_type):
+    print("a")
     if partner_models is "None":
+        print("b")
         return None
+    print("c")
 
     if type(partner_models) is list:
+        print("d")
         model_paths = partner_models
+        print("e")
     else:
         print(f"loading {partner_type} agents")
         model_paths = load_json_list(partner_models)
 
-        train_set_indexes = load_json_list(
-                args.train_test_splits)[args.split_index][partner_type]
-        model_paths = [model_paths[i] for i in train_set_indexes]
+        if not args.cosca:
+            train_set_indexes = load_json_list(
+                    args.train_test_splits)[args.split_index][partner_type]
+            model_paths = [model_paths[i] for i in train_set_indexes]
 
     partners = []
 
@@ -764,7 +785,7 @@ def parse_args():
     parser.add_argument("--actor_sync_freq", type=int, default=10)
 
     parser.add_argument("--save_checkpoints", type=int, default=100)
-    parser.add_argument("--convention", type=str, default="None")
+    parser.add_argument("--conventions", type=str, default="None")
     parser.add_argument("--parameterized", type=int, default=0)
     parser.add_argument("--parameter_type", type=str, default="one_hot")
     parser.add_argument("--num_parameters", type=int, default=0)
@@ -789,10 +810,12 @@ def parse_args():
     parser.add_argument("--record_convention_stats", type=int, default=0)
     parser.add_argument("--dist_shuffle_colour", type=int, default=0)
     parser.add_argument("--dist_shuffle_colour_lr", type=float, default=0)
+    parser.add_argument("--val", type=int, default=0)
+    parser.add_argument("--cosca", type=int, default=0)
 
     args = parser.parse_args()
 
-    if args.dist_shuffle_colour_lr >= 0:
+    if args.dist_shuffle_colour_lr > 0:
         args.save_dir = f"{args.save_dir}_a{args.dist_shuffle_colour_lr}"
 
     if args.class_aux_weight > 0:

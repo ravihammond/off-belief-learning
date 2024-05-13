@@ -37,7 +37,7 @@ class ActGroup:
         off_belief,
         belief_model,
         belief_cfg,
-        convention,
+        train_conventions,
         convention_act_override,
         convention_fict_act_override,
         partners,
@@ -52,7 +52,8 @@ class ActGroup:
         shuffle_color_sync=False,
         num_train_partners=0,
         dist_shuffle_colour=0,
-        permutation_distribution=[]
+        permutation_distribution=[],
+        shuffle_convention=False
     ):
         self.devices = devices.split(",")
         self.method = method
@@ -64,7 +65,7 @@ class ActGroup:
         self.boltzmann_t = boltzmann_t
         self.trinary = trinary
         self.replay_buffer = replay_buffer
-        self.convention = convention
+        self.train_conventions = train_conventions
         self.convention_act_override = convention_act_override
         self.convention_fict_act_override = convention_fict_act_override
         self.partners = partners
@@ -88,6 +89,7 @@ class ActGroup:
         self.num_train_partners = num_train_partners
         self.dist_shuffle_colour = dist_shuffle_colour
         self.permutation_distribution = permutation_distribution
+        self.shuffle_convention = shuffle_convention
 
         (self.model_runners, 
          self.belief_runner, 
@@ -160,6 +162,9 @@ class ActGroup:
                 runner.add_method("act", 5000)
                 partner_runners.append(runner)
 
+        for partner_runner in partner_runners:
+            partner_runner.print_model()
+
         return model_runners, belief_runner, partner_runners
 
     def create_r2d2_actors(self):
@@ -189,12 +194,13 @@ class ActGroup:
                         self.multi_step,
                         self.max_len,
                         self.gamma,
-                        self.convention,
+                        self.train_conventions,
                         0, # act paramaterized
                         0, # convention index
                         0, # convention act override
                         0, # convention fict act override
                         1, # convention use experience
+                        self.shuffle_convention
                     )
                     self.seed += 1
                     thread_actors.append([actor])
@@ -234,6 +240,9 @@ class ActGroup:
                             iql_legacy = partner["iql_legacy"]
                             shuffle_colour = 0
 
+                        if k == 1:
+                            runner.print_model()
+                        
                         actor = hanalearn.R2D2Actor(
                             runner,
                             self.seed,
@@ -250,7 +259,7 @@ class ActGroup:
                             self.cfgs[agent_idx]["multi_step"],
                             self.cfgs[agent_idx]["max_len"],
                             self.cfgs[agent_idx]["gamma"],
-                            self.convention,
+                            self.train_conventions,
                             parameterized,
                             parameter_index,
                             self.convention_act_override[k],
@@ -268,6 +277,7 @@ class ActGroup:
                             self.all_inverse_colour_permutations,
                             self.dist_shuffle_colour,
                             self.permutation_distribution,
+                            self.shuffle_convention
                         )
 
                         if self.off_belief:

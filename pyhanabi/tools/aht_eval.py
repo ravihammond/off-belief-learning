@@ -230,7 +230,7 @@ def run_jobs(args, jobs):
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--aht_model", type=str, required=True)
-    parser.add_argument("--train_partner_model", type=str, required=True)
+    parser.add_argument("--train_partner_model", type=str, default=None)
     parser.add_argument("--partner_model", type=str, required=True)
     parser.add_argument("--split_type", type=str, required=True)
     parser.add_argument("--split_indices", type=str, required=True)

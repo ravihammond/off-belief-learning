@@ -3,5 +3,10 @@
     "../training_models/obl1/obl1_2/model0.pthw",
     "../training_models/obl1/obl1_3/model0.pthw",
     "../training_models/obl1/obl1_4/model0.pthw",
-    "../training_models/obl1/obl1_5/model0.pthw"
+    "../training_models/obl1/obl1_5/model0.pthw",
+    "../training_models/obl1/obl1_6/model0.pthw",
+    "../training_models/obl1/obl1_7/model0.pthw",
+    "../training_models/obl1/obl1_8/model0.pthw",
+    "../training_models/obl1/obl1_9/model0.pthw",
+    "../training_models/obl1/obl1_10/model0.pthw"
 ]

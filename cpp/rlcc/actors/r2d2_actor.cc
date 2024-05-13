@@ -13,7 +13,7 @@
 
 using namespace std;
 
-#define PR false
+#define PR true
 
 void R2D2Actor::addHid(rela::TensorDict& to, rela::TensorDict& hid) {
   for (auto& kv : hid) {
@@ -160,6 +160,11 @@ void R2D2Actor::reset(const HanabiEnv& env) {
       playerTemp_[i] = tempList_[rng_() % tempList_.size()];
     }
 
+    if (shuffleConvention_) {
+      std::uniform_int_distribution dist(0, (int)conventions_.size() - 1);
+      conventionIdx_ = dist(rng_);
+    }
+
     // other-play
     if (shuffleColor_ && !colourPermuteConstant_) {
       auto& colorPermute = colorPermutes_[i];
@@ -237,14 +242,19 @@ void R2D2Actor::reset(const HanabiEnv& env) {
         }
         printf("}\n");
       }
+
     }
   }
 
-  if (conventionOverride_ > 0 && convention_.size()) { 
-    conventionIdx_ = rng_() % convention_.size();
-    auto conv = convention_[conventionIdx_][0];
-    if(PR)printf("convention index: %d, %s->%s\n", conventionIdx_, 
-        conv[0].c_str(), conv[1].c_str());
+  if (shuffleConvention_ && conventionOverride_ > 0 && conventions_.size()) { 
+    conventionIdx_ = rng_() % conventions_.size();
+  }
+
+  if (PR && conventionOverride_ > 0 && conventions_.size()) { 
+    printf("conventionIdx_: %d, convention: [%s, %s]\n", conventionIdx_,
+           conventions_[conventionIdx_][0].c_str(),
+           conventions_[conventionIdx_][1].c_str());
+    printf("conventionOverride_: %d\n", conventionOverride_);
   }
 }
 
@@ -335,6 +345,7 @@ void R2D2Actor::observeBeforeAct(HanabiEnv& env) {
   }
 
   addHid(input, hidden_);
+  /* gameStory_["t" + ] */
 
   // no-blocking async call to neural network
   futReply_ = runner_->call("act", input);
@@ -526,22 +537,20 @@ void R2D2Actor::fictAct(const HanabiEnv& env) {
     move = env.getMove(action);
 
     if (conventionFictitiousOverride_) {
-      for (auto convention: convention_[conventionIdx_]) {
-        auto senderMove = strToMove(convention[0]);
-        auto responseMove = strToMove(convention[1]);
+      auto convention = conventions_[conventionIdx_];
+      auto senderMove = strToMove(convention[0]);
+      auto responseMove = strToMove(convention[1]);
 
-        auto moveHistory = fictState_->MoveHistory();
-        auto lastMove = moveHistory[moveHistory.size() - 1].move;
-        if (lastMove.MoveType() == hle::HanabiMove::kDeal) {
-          lastMove = moveHistory[moveHistory.size() - 2].move;
-        }
+      auto moveHistory = fictState_->MoveHistory();
+      auto lastMove = moveHistory[moveHistory.size() - 1].move;
+      if (lastMove.MoveType() == hle::HanabiMove::kDeal) {
+        lastMove = moveHistory[moveHistory.size() - 2].move;
+      }
 
-        if (lastMove.MoveType() != hle::HanabiMove::kDeal &&
-            lastMove == senderMove && 
-            fictState_->MoveIsLegal(responseMove)) {
-          move = responseMove;
-          break;
-        }
+      if (lastMove.MoveType() != hle::HanabiMove::kDeal 
+        && lastMove == senderMove 
+                && fictState_->MoveIsLegal(responseMove)) {
+        move = responseMove;
       }
     }
   }
@@ -616,4 +625,3 @@ void R2D2Actor::pushToReplayBuffer() {
     replayBuffer_->add(std::move(lastEpisode_), 1);
   }
 }
-

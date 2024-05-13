@@ -22,10 +22,25 @@ from model_zoo import model_zoo
 
 def evaluate_model(args):
     weight_files = load_weights(args)
-    scores, actors = run_evaluation(args, weight_files)
+    score, perfect, scores, actors = run_evaluation(args, weight_files)
     print_scores(scores)
-    print_played_card_knowledge(actors, 0)
-    print_played_card_knowledge(actors, 1)
+
+    file_name = weight_files[0].split("/")[3]
+    file_path = os.path.join(
+        "jax_deck_scores",
+        weight_files[0].split("/")[2],
+        f"{file_name}.txt"
+    )
+    dir_path = os.path.dirname(file_path)
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+    print(f"Saving: {file_path}")
+    with open(file_path, 'w') as file:
+        for seed, score in enumerate(scores):
+            file.write(f"{seed},{int(score)}\n")
+
+    # print_played_card_knowledge(actors, 0)
+    # print_played_card_knowledge(actors, 1)
 
 
 def load_weights(args):
@@ -49,7 +64,8 @@ def load_weights(args):
 
 
 def run_evaluation(args, weight_files):
-    _, _, _, scores, actors = evaluate_saved_model(
+    print(weight_files[0].split("/")[3])
+    score, _, perfect,scores, actors = evaluate_saved_model(
         weight_files,
         args.num_game,
         args.seed,
@@ -59,7 +75,7 @@ def run_evaluation(args, weight_files):
         override=[args.override1, args.override2],
     )
 
-    return scores, actors
+    return score, perfect, scores, actors
 
 
 def print_scores(scores):

@@ -80,7 +80,7 @@ PYBIND11_MODULE(hanalearn, m) {
         int, // multiStep,
         int, // seqLen,
         float,  // gamma
-        std::vector<std::vector<std::vector<std::string>>>, // convention
+        std::vector<std::vector<std::string>>, // conventions
         bool, // actParameterized
         int, // conventionIdx
         int, // conventionOverride
@@ -97,7 +97,8 @@ PYBIND11_MODULE(hanalearn, m) {
         std::vector<std::vector<int>>, // allColourPermutations
         std::vector<std::vector<int>>, // allInvColourPermutations
         bool, // distShuffleColour
-        std::vector<std::vector<float>>>()) // permutationDistribution
+        std::vector<std::vector<float>>, // permutationDistribution
+        bool>()) // shuffleConvention
     .def(py::init<
         std::shared_ptr<rela::BatchRunner>,
         int,  // numPlayer
@@ -105,9 +106,9 @@ PYBIND11_MODULE(hanalearn, m) {
         bool,  // vdn
         bool,  // sad
         bool,  // hideAction
-        std::vector<std::vector<std::vector<std::string>>>, // convention
+        std::vector<std::vector<std::string>>, // conventions
         bool, // actParameterized
-        int, // conventionIdx
+        int, // onventionIdx
         int, // conventionOverride
         bool, // beliefStats
         bool, // sadLegacy
@@ -118,7 +119,8 @@ PYBIND11_MODULE(hanalearn, m) {
         bool, // distShuffleColour
         std::vector<std::vector<float>>, // permutationDistribution
         int, // partnerIdx
-        int>()) // seed
+        int, // seed
+        bool>()) // shuffleConvention
       .def("set_partners", &R2D2Actor::setPartners)
       .def("set_belief_runner", &R2D2Actor::setBeliefRunner)
       .def("set_belief_runner_stats", &R2D2Actor::setBeliefRunnerStats)
@@ -127,7 +129,8 @@ PYBIND11_MODULE(hanalearn, m) {
       .def("get_convention_index", &R2D2Actor::getConventionIndex)
       .def("set_compare_runners", &R2D2Actor::setCompareRunners)
       .def("set_colour_permute", &R2D2Actor::setColourPermute)
-      .def("set_permutation_distribution", &R2D2Actor::setPermutationDistribution);
+      .def("set_permutation_distribution", &R2D2Actor::setPermutationDistribution)
+      .def("get_game_story", &R2D2Actor::getGameStory);
 
   m.def("observe", py::overload_cast<const hle::HanabiState&, int, bool>(&observe));
 
@@ -153,7 +156,8 @@ PYBIND11_MODULE(hanalearn, m) {
         std::vector<std::shared_ptr<HanabiEnv>>,
         std::vector<std::vector<std::shared_ptr<R2D2Actor>>>,
         bool,
-        int>())
+        int,
+        std::vector<std::vector<hle::HanabiCardValue>>>()) // forcedDecks
     .def("get_time_stats", &HanabiThreadLoop::getTimeStats);
 
   // bind some hanabi util classes
@@ -184,20 +188,20 @@ PYBIND11_MODULE(hanalearn, m) {
     .def("color", &HanabiCardValue::Color)
     .def("rank", &HanabiCardValue::Rank)
     .def("is_valid", &HanabiCardValue::IsValid)
-    .def("to_string", &HanabiCardValue::ToString)
-    .def(py::pickle(
-          [](const HanabiCardValue& c) {
-          // __getstate__
-          return py::make_tuple(c.Color(), c.Rank());
-          },
-          [](py::tuple t) {
-          // __setstate__
-          if (t.size() != 2) {
-          throw std::runtime_error("Invalid state!");
-          }
-          HanabiCardValue c(t[0].cast<int>(), t[1].cast<int>());
-          return c;
-          }));
+    .def("to_string", &HanabiCardValue::ToString);
+    /* .def(py::pickle( */
+    /*       [](const HanabiCardValue& c) { */
+    /*       // __getstate__ */
+    /*       return py::make_tuple(c.Color(), c.Rank()); */
+    /*       }, */
+    /*       [](py::tuple t) { */
+    /*       // __setstate__ */
+    /*       if (t.size() != 2) { */
+    /*       throw std::runtime_error("Invalid state!"); */
+    /*       } */
+    /*       HanabiCardValue c(t[0].cast<int>(), t[1].cast<int>()); */
+    /*       return c; */
+    /*       })); */
 
   py::class_<HanabiHistoryItem>(m, "HanabiHistoryItem")
     .def(py::init<HanabiMove>())

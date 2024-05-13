@@ -14,7 +14,6 @@ from eval import evaluate_saved_model
 from model_zoo import model_zoo
 from collect_actor_stats import collect_stats
 
-
 def evaluate_model(args):
     if args.output is not None:
         sys.stdout = Logger(args.output)
@@ -42,16 +41,25 @@ def evaluate_model(args):
         print_actor_stats(stats, 0, convention_string)
         print_actor_stats(stats, 1, convention_string)
 
+    exit
+
     if args.csv_name != "None":
         file_path = os.path.dirname(args.csv_name)
         if not os.path.exists(file_path):
             os.makedirs(file_path)
         wrapped_scores = [[x] for x in scores]
         print(f"Saving: {args.csv_name}")
-        file = open(args.csv_name, 'w+', newline ='')
-        with file:
-            write = csv.writer(file)
-            write.writerows(wrapped_scores)
+        # pprint(wrapped_scores)
+        with open(args.csv_name, 'w') as file:
+            for seed, score in enumerate(scores):
+                file.write(f"{seed},{int(score)}\n")
+        # file = open(args.csv_name, 'w+', newline ='')
+        # with file:
+        #     write = csv.writer(file)
+        #     write.writerows(wrapped_scores)
+
+    # save_game_actions(actors)
+    # save_game_story(actors)
 
     return score, stats["bomb_out_rate"], stats
 
@@ -106,7 +114,9 @@ def run_evaluation(args, weight_files):
         iql_legacy=args.iql_legacy,
         # partner_model_type="test",
         partner_model_type="train",
-        shuffle_index=[args.shuffle_index1, args.shuffle_index2]
+        shuffle_index=[args.shuffle_index1, args.shuffle_index2],
+        shuffle_convention_index=[
+            args.shuffle_conv_index1, args.shuffle_conv_index2],
     )
 
     return score, perfect, scores, actors
@@ -215,6 +225,61 @@ def extract_convention_strings(conventions):
 
     return convention_strings
 
+def save_game_story(actors):
+    game_story = []
+    games_stories = [actors[0].get_game_story(), actors[1].get_game_story()]
+
+    for turn in range(200):
+        if f"t{turn}:a{0}:current" not in games_stories[0].keys():
+            break
+        turn_data = {}
+        for actor_idx in [0, 1]:
+            actor_data = {}
+            prefix = f"t{turn}:a{actor_idx}"
+            actor_data["current"] = bool(games_stories[actor_idx][f"{prefix}:current"])
+            actor_data["a"] = int(games_stories[actor_idx][f"{prefix}:a"])
+            actor_data["priv_s"] = [
+                round(float(x),20) for x in list(games_stories[actor_idx][f"{prefix}:priv_s"])
+            ]
+            actor_data["h0"] = [round(float(x),20) for x in list(games_stories[actor_idx][f"{prefix}:h0"].ravel())]
+            actor_data["c0"] = [round(float(x),20) for x in list(games_stories[actor_idx][f"{prefix}:c0"].ravel())]
+            turn_data[f"actor{actor_idx}"] = actor_data
+        game_story.append(turn_data)
+
+    file_path = "jax_test_data/cpp_game_story_seed6.json"
+    with open(file_path, "w") as fp:
+        print(f"saving game story: {file_path}")
+        json.dump(game_story, fp)
+
+
+def save_game_actions(actors):
+    for i, actor in enumerate(actors):
+        if f"t0:a0:a" in actor.get_game_story().keys():
+            print(f"{i}: true")
+        else:
+            print(f"{i}: false")
+
+    actors_zipped = [(actors[i], actors[i + 1]) for i in np.arange(0, int(len(actors)), 2)]
+
+    games = []
+    for actor1, actor2 in actors_zipped:
+        actions = []
+        actor_stories = [actor1.get_game_story(), actor2.get_game_story()]
+        for turn in range(200):
+            if f"t{turn}:a{turn % 2}:a" not in actor_stories[turn % 2].keys():
+                print(f"t{turn}:a{turn % 2}:a not in story")
+                break
+            actor_idx = turn % 2
+            prefix = f"t{turn}:a{actor_idx}"
+            actions.append(int(actor_stories[actor_idx][f"{prefix}:a"]))
+        games.append(actions)
+
+    file_path = "jax_test_data/cpp_deck_actions.json"
+    with open(file_path, "w") as fp:
+        print(f"saving deck actions: {file_path}")
+        json.dump(games, fp)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--weight1", default=None, type=str, required=True)
@@ -242,6 +307,8 @@ if __name__ == "__main__":
     parser.add_argument("--shuffle_index1", default=-1, type=int)
     parser.add_argument("--shuffle_index2", default=-1, type=int)
     parser.add_argument("--print_stats", default=1, type=int)
+    parser.add_argument("--shuffle_conv_index1", default=-1, type=int)
+    parser.add_argument("--shuffle_conv_index2", default=-1, type=int)
     args = parser.parse_args()
 
     args.sad_legacy = [int(x) for x in args.sad_legacy.split(",")]

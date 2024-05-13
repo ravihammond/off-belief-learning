@@ -37,8 +37,7 @@ def create_envs(
         game = hanalearn.HanabiEnv(
             params,
             max_len,
-            False,
-        )
+            False,)
         games.append(game)
     return games
 
@@ -59,7 +58,7 @@ def create_threads(num_thread, num_game_per_thread, actors, games):
             thread_idx * num_game_per_thread : (thread_idx + 1) * num_game_per_thread
         ]
         thread = hanalearn.HanabiThreadLoop(
-                envs, actors[thread_idx], False, thread_idx)
+                envs, actors[thread_idx], False, thread_idx, [])
         threads.append(thread)
         context.push_thread_loop(thread)
     print(

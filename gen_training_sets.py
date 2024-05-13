@@ -10,39 +10,46 @@ def generate_train_test(args):
     all_models = list(range(args.num_models))
     all_splits = []
 
-    train_sets = set()
+    seen_splits = set()
     test_occurances = {}
 
     num_splits = min(args.num_splits, choose(args.num_models, args.num_train))
 
     for i in range(num_splits):
-        train_test = {}
+        train_test_val = {}
 
         while True:
             random.shuffle(all_models)
             train_set = all_models[:args.num_train]
-            test_set = all_models[args.num_train:]
+            test_set = all_models[args.num_train:args.num_train + args.num_test]
+            val_set = all_models[args.num_train + args.num_test:]
             train_set.sort()
             test_set.sort()
+            val_set.sort()
             train_set_key = '-'.join(str(x) for x in train_set)
+            test_set_key = '-'.join(str(x) for x in test_set)
+            val_set_key = '-'.join(str(x) for x in val_set)
+            split_key = train_set_key + "|" + test_set_key + "|" + val_set_key
 
-            if train_set_key not in train_sets:
+            if split_key not in seen_splits:
                 if args.max_test_occurances != -1:
                     test_count_okay(test_set, test_occurances, args.max_test_occurances)
                     continue
                 break
             
                 
-        train_test["train"] = train_set
-        train_test["test"] = test_set
-        all_splits.append(train_test)
+        train_test_val["train"] = train_set
+        train_test_val["test"] = test_set
+        train_test_val["val"] = val_set
 
-        train_sets.add(train_set_key)
+        all_splits.append(train_test_val)
+        seen_splits.add(train_set_key)
 
     pprint(all_splits)
 
-    with open(args.output, "w") as outfile:
-        json.dump(all_splits, outfile, indent=4)
+    if args.save:
+        with open(args.output, "w") as outfile:
+            json.dump(all_splits, outfile, indent=4)
 
 def choose(n, k):
     if k == 0: 
@@ -78,8 +85,11 @@ if __name__ == "__main__":
     parser.add_argument("--output", type=str, required=True)
     parser.add_argument("--num_models", type=int, default=13)
     parser.add_argument("--num_train", type=int, default=6)
+    parser.add_argument("--num_test", type=int, default=7)
+    parser.add_argument("--num_val", type=int, default=0)
     parser.add_argument("--num_splits", type=int, default=100)
     parser.add_argument("--max_test_occurances", type=int, default=-1)
+    parser.add_argument("--save", type=int, default=1)
 
     args = parser.parse_args()
     generate_train_test(args)

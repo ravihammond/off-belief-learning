@@ -7,17 +7,17 @@
 
 using namespace std;
 
-#define CV false
+#define CV true
 
 void R2D2Actor::conventionReset(const HanabiEnv& env) {
   (void)env;
-  if (convention_.size() == 0 || convention_[conventionIdx_].size() == 0) {
+  if (conventions_.size() == 0 || conventions_[conventionIdx_].size() == 0) {
     return;
   }
   sentSignal_ = false;
   sentSignalStats_ = false;
   beliefStatsSignalReceived_ = false;
-  auto responseMove = strToMove(convention_[conventionIdx_][0][1]);
+  auto responseMove = strToMove(conventions_[conventionIdx_][1]);
   beliefStatsResponsePosition_ = responseMove.CardIndex();
 }
 
@@ -94,13 +94,13 @@ void R2D2Actor::replyCompareAct(const HanabiEnv& env,
 
 hle::HanabiMove R2D2Actor::overrideMove(const HanabiEnv& env, hle::HanabiMove move, 
     vector<float> actionQ, bool exploreAction, vector<float> legalMoves) {
-  if (conventionOverride_ == 0|| convention_.size() == 0 || 
-      convention_[conventionIdx_].size() == 0) {
+  if (conventionOverride_ == 0|| conventions_.size() == 0 || 
+      conventions_[conventionIdx_].size() == 0) {
     return move;
   }
   auto lastMove = env.getMove(env.getLastAction());
-  auto signalMove = strToMove(convention_[conventionIdx_][0][0]);
-  auto responseMove = strToMove(convention_[conventionIdx_][0][1]);
+  auto signalMove = strToMove(conventions_[conventionIdx_][0]);
+  auto responseMove = strToMove(conventions_[conventionIdx_][1]);
   auto& state = env.getHleState();
   int nextPlayer = (playerIdx_ + 1) % 2;
 
@@ -114,6 +114,7 @@ hle::HanabiMove R2D2Actor::overrideMove(const HanabiEnv& env, hle::HanabiMove mo
 
   if (conventionOverride_ == 2 || conventionOverride_ == 3 ) {
     if (lastMove == signalMove) {
+      if(CV)printf("Original move: %s\n", move.ToString().c_str());
       return responseMove;
     } else if (move == responseMove) {
       vector<hle::HanabiMove> exclude = {responseMove};
@@ -126,7 +127,10 @@ hle::HanabiMove R2D2Actor::overrideMove(const HanabiEnv& env, hle::HanabiMove mo
           return signalMove;
         }
       }
-      return different_action(env, exclude, actionQ, exploreAction, legalMoves);
+      
+      auto move = different_action(env, exclude, actionQ, exploreAction, legalMoves);
+      if(CV)printf("Original move: %s\n", move.ToString().c_str());
+      return move;
     }
   }
 
@@ -134,11 +138,14 @@ hle::HanabiMove R2D2Actor::overrideMove(const HanabiEnv& env, hle::HanabiMove mo
     if (!sentSignal_ && movePlayableOnFireworks(env, responseMove, nextPlayer) 
         && state.MoveIsLegal(signalMove)) {
       sentSignal_ = true;
+      if(CV)printf("Original move: %s\n", move.ToString().c_str());
       return signalMove;
     } else if (move == signalMove) {
       vector<hle::HanabiMove> exclude = {signalMove};
       if (conventionOverride_ == 3) exclude.push_back(responseMove);
-      return different_action(env, exclude, actionQ, exploreAction, legalMoves);
+      auto move = different_action(env, exclude, actionQ, exploreAction, legalMoves);
+      if(CV)printf("Original move: %s\n", move.ToString().c_str());
+      return move;
     }
   }
 
@@ -229,7 +236,9 @@ hle::HanabiMove R2D2Actor::strToMove(string key) {
 }
 
 void R2D2Actor::incrementStat(std::string key) {
-  if (stats_.find(key) == stats_.end()) stats_[key] = 0;
+  if (stats_.find(key) == stats_.end()) {
+    stats_[key] = 0;
+  } 
   stats_[key]++;
 }
 
@@ -271,14 +280,14 @@ void R2D2Actor::incrementStatsBeforeMove(
 
 void R2D2Actor::incrementStatsConvention(
     const HanabiEnv& env, hle::HanabiMove move) {
-  if (convention_.size() == 0 || 
-      convention_[conventionIdx_].size() == 0) {
+  if (conventions_.size() == 0 || 
+      conventions_[conventionIdx_].size() == 0) {
     return;
   }
 
   auto lastMove = env.getMove(env.getLastAction());
-  auto signalMove = strToMove(convention_[conventionIdx_][0][0]);
-  auto responseMove = strToMove(convention_[conventionIdx_][0][1]);
+  auto signalMove = strToMove(conventions_[conventionIdx_][0]);
+  auto responseMove = strToMove(conventions_[conventionIdx_][1]);
   auto& state = env.getHleState();
   bool shouldHavePlayedSignal = false;
   bool shouldHavePlayedResponse = false;
@@ -341,18 +350,8 @@ void R2D2Actor::incrementStatsConventionRole(bool shouldHavePlayed, string role,
 }
 
 string R2D2Actor::conventionString() {
-  string conventionStr = "";
-
-  auto conventionSet = convention_[conventionIdx_];
-  for (size_t i = 0; i < conventionSet.size(); i++) {
-    if (i > 0) {
-      conventionStr += "-";
-    }
-    auto convention = conventionSet[i];
-    conventionStr += convention[0] + convention[1];
-  }
-
-  return conventionStr;
+  auto convention = conventions_[conventionIdx_];
+  return convention[0] + convention[1];
 }
 
 void R2D2Actor::incrementStatsTwoStep(
@@ -425,8 +424,8 @@ tuple<int, int, vector<int>> R2D2Actor::beliefConventionPlayable(const HanabiEnv
   assert(!partners_[(playerIdx_ + 1) % 2].expired());
   auto partner = partners_[(playerIdx_ + 1) % 2].lock();
   if (curPlayer != playerIdx_ 
-      || convention_.size() == 0 
-      || convention_[conventionIdx_].size() == 0
+      || conventions_.size() == 0 
+      || conventions_[conventionIdx_].size() == 0
       || partner->previousHand_ == nullptr) {
     return make_tuple(0, beliefStatsResponsePosition_, playableCards);
   }
@@ -434,8 +433,8 @@ tuple<int, int, vector<int>> R2D2Actor::beliefConventionPlayable(const HanabiEnv
   auto& state = env.getHleState();
   auto partnerLastMove = env.getMove(env.getLastAction());
   auto myLastMove = env.getMove(env.getSecondLastAction());
-  auto signalMove = strToMove(convention_[conventionIdx_][0][0]);
-  auto responseMove = strToMove(convention_[conventionIdx_][0][1]);
+  auto signalMove = strToMove(conventions_[conventionIdx_][0]);
+  auto responseMove = strToMove(conventions_[conventionIdx_][1]);
 
   // Reset if partners play may be the signal card 
   if (beliefStatsSignalReceived_

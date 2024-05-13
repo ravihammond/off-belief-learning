@@ -48,3 +48,8 @@ wandb_api_key.txt
 
 temp
 test.cpp
+
+/pyhanabi/cpp_game_story_seed0.json
+/pyhanabi/cpp_game_story_seed3.json
+/pyhanabi/jax_deck_scores/*
+/pyhanabi/jax_test_data/*

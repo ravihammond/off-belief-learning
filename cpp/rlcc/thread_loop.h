@@ -13,7 +13,7 @@
 #include "rela/thread_loop.h"
 #include "rlcc/actors/r2d2_actor.h"
 
-#define PR false
+#define PR true
 
 class HanabiThreadLoop : public rela::ThreadLoop {
  public:
@@ -21,13 +21,15 @@ class HanabiThreadLoop : public rela::ThreadLoop {
       std::vector<std::shared_ptr<HanabiEnv>> envs,
       std::vector<std::vector<std::shared_ptr<R2D2Actor>>> actors,
       bool eval,
-      int threadIdx)
+      int threadIdx,
+      std::vector<std::vector<hle::HanabiCardValue>> forcedDecks)
     : envs_(std::move(envs))
       , actors_(std::move(actors))
       , done_(envs_.size(), -1)
       , eval_(eval) 
       , avgN_(400) 
-      , threadIdx_(threadIdx) {
+      , threadIdx_(threadIdx)
+      , forcedDecks_(forcedDecks) {
         assert(envs_.size() == actors_.size());
       }
 
@@ -61,7 +63,11 @@ class HanabiThreadLoop : public rela::ThreadLoop {
             }
           }
 
-          envs_[i]->reset();
+          if (forcedDecks_.size() > 0) {
+            envs_[i]->resetWithDeck(forcedDecks_[i]);
+          } else {
+            envs_[i]->reset();
+          }
           for (size_t j = 0; j < actors.size(); ++j) {
             if(PR)printf("\n[player %ld resetting]\n", j);
             actors[j]->reset(*envs_[i]);
@@ -83,33 +89,63 @@ class HanabiThreadLoop : public rela::ThreadLoop {
       timeStats_[0] = approxRollingAverage(
           timeStats_[0], ((double)t)/CLOCKS_PER_SEC);
 
-      if(PR)printf("\nScore: %d\n", envs_[0]->getScore());
-      if(PR)printf("Lives: %d\n", envs_[0]->getLife());
-      if(PR)printf("Information: %d\n", envs_[0]->getInfo());
-      auto deck = envs_[0]->getHleState().Deck();
-      if(PR)printf("Deck: %d\n", deck.Size());
-      std::string colours = "RYGWB";
-      if(PR)printf("Discards: ");
-      auto& discards = envs_[0]->getHleState().DiscardPile();
-      for (auto card: discards) {
-        int card_colour = card.Color();
-        int rank = card.Rank();
-        if(PR)printf("%C%d ", colours[card_colour], rank);
-      }
-      if(PR)printf("\n");
-      auto fireworks = envs_[0]->getFireworks();
-      if(PR)printf("Fireworks: ");
-      for (unsigned long i = 0; i < colours.size(); i++)
-        if(PR)printf("%c%d ", colours[i], fireworks[i]);
-      if(PR)printf("\n");
-      auto hands = envs_[0]->getHleState().Hands();
-      int cp = envs_[0]->getCurrentPlayer();
-      for(unsigned long i = 0; i < hands.size(); i++) {
-        if(PR)printf("Actor %ld hand:%s\n", i,
-            cp == (int)i ? " <-- current player" : ""); 
-        auto hand = hands[i].ToString();
-        hand.pop_back();
-        if(PR)printf("%s\n", hand.c_str());
+      for (size_t i = 0; i < envs_.size(); ++i) {
+        if(PR)printf("\nScore: %d\n", envs_[i]->getScore());
+        if(PR)printf("Lives: %d\n", envs_[i]->getLife());
+        if(PR)printf("Information: %d\n", envs_[i]->getInfo());
+        auto deck = envs_[i]->getHleState().Deck();
+        if(PR)printf("Deck: %d\n", deck.Size());
+        std::string colours = "RYGWB";
+        if(PR)printf("Discards: ");
+        auto& discards = envs_[i]->getHleState().DiscardPile();
+        for (auto card: discards) {
+          int card_colour = card.Color();
+          int rank = card.Rank() + 1;
+          if(PR)printf("%C%d ", colours[card_colour], rank);
+        }
+        if(PR)printf("\n");
+        auto fireworks = envs_[i]->getFireworks();
+        if(PR)printf("Fireworks: ");
+        for (unsigned long i = 0; i < colours.size(); i++)
+          if(PR)printf("%c%d ", colours[i], fireworks[i]);
+        if(PR)printf("\n");
+        auto hands = envs_[i]->getHleState().Hands();
+        int cp = envs_[i]->getCurrentPlayer();
+        for(unsigned long i = 0; i < hands.size(); i++) {
+          if(PR)printf("Actor %ld hand:%s\n", i,
+              cp == (int)i ? " <-- current player" : ""); 
+          auto hand = hands[i].ToString();
+          hand.pop_back();
+          if(PR)printf("%s\n", hand.c_str());
+          /* if (PR && cp == (int)i) { */
+          /*   printf("e\n"); */
+          /*   printf("f\n"); */
+          /*   printf("g\n"); */
+          /*   auto legalMoves = envs_[i]->getHleState().LegalMoves(i); */
+          /*   printf("h\n"); */
+          /*   std::vector<int> vLegalMove(envs_[i]->getHleGame().MaxMoves() + 1); */
+          /*   printf("i\n"); */
+          /*   for (auto move : legalMoves) { */
+          /*     printf("j\n"); */
+          /*     auto uid = envs_[i]->getHleGame().GetMoveUid(move); */
+          /*     printf("i\n"); */
+          /*     vLegalMove[uid] = 1; */
+          /*     printf("k\n"); */
+          /*   } */
+          /*   printf("l\n"); */
+          /*   if (legalMoves.size() == 0) { */
+          /*     printf("m\n"); */
+          /*     vLegalMove[envs_[i]->getHleGame().MaxMoves()] = 1; */
+          /*     printf("n\n"); */
+          /*   } */
+          /*   printf("o\n"); */
+          /*   printf("Legal moves: "); */
+          /*   for (auto moveIsLegal: vLegalMove) { */
+          /*     printf("%d ", moveIsLegal); */
+          /*   } */
+          /*   printf("\n"); */
+          /* } */
+        }
       }
 
       if(PR)printf("\n----\n");
@@ -215,5 +251,6 @@ class HanabiThreadLoop : public rela::ThreadLoop {
   std::vector<double> timeStats_ = std::vector<double>(5, 0);
   double avgN_;
   int threadIdx_;
+  std::vector<std::vector<hle::HanabiCardValue>> forcedDecks_;
 };
 

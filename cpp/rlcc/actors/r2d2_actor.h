@@ -32,7 +32,7 @@ class R2D2Actor {
         int multiStep,
         int seqLen,
         float gamma,
-        std::vector<std::vector<std::vector<std::string>>> convention,
+        std::vector<std::vector<std::string>> conventions,
         bool actParameterized,
         int conventionIdx,
         int conventionOverride,
@@ -49,7 +49,8 @@ class R2D2Actor {
         std::vector<std::vector<int>> allColourPermutations,
         std::vector<std::vector<int>> allInvColourPermutations,
         bool distShuffleColour,
-        std::vector<std::vector<float>> permutationDistribution)
+        std::vector<std::vector<float>> permutationDistribution,
+        bool shuffleConvention)
           : runner_(std::move(runner))
             , rng_(seed)
             , numPlayer_(numPlayer)
@@ -70,7 +71,7 @@ class R2D2Actor {
             , r2d2Buffer_(std::make_unique<rela::R2D2Buffer>(multiStep, seqLen, gamma))
 
             // My changes
-            , convention_(convention) 
+            , conventions_(conventions) 
             , conventionIdx_(conventionIdx) 
             , conventionOverride_(conventionOverride) 
             , conventionFictitiousOverride_(conventionFictitiousOverride)
@@ -95,11 +96,10 @@ class R2D2Actor {
             , allColourPermutations_(allColourPermutations)
             , allInvColourPermutations_(allInvColourPermutations)
             , distShuffleColour_(distShuffleColour) 
-            , permutationDistribution_(permutationDistribution) {
-      //printf("multiStep: %d, seqLen: %d, gamma: %f\n", 
-          //multiStep, seqLen, gamma);
-      if (beliefStats_ && convention_.size() > 0) {
-        auto responseMove = strToMove(convention_[conventionIdx_][0][1]);
+            , permutationDistribution_(permutationDistribution) 
+            , shuffleConvention_(shuffleConvention) {
+      if (beliefStats_ && conventions_.size() > 0) {
+        auto responseMove = strToMove(conventions_[conventionIdx_][1]);
         beliefStatsResponsePosition_ = responseMove.CardIndex();
       }
 
@@ -119,7 +119,7 @@ class R2D2Actor {
         bool vdn,
         bool sad,
         bool hideAction,
-        std::vector<std::vector<std::vector<std::string>>> convention,
+        std::vector<std::vector<std::string>> conventions,
         bool actParameterized,
         int conventionIdx,
         int conventionOverride,
@@ -132,7 +132,8 @@ class R2D2Actor {
         bool distShuffleColour,
         std::vector<std::vector<float>> permutationDistribution,
         int partnerIdx,
-        int seed)
+        int seed,
+        bool shuffleConvention)
       : runner_(std::move(runner))
         , rng_(seed)
         , numPlayer_(numPlayer)
@@ -151,7 +152,7 @@ class R2D2Actor {
         , r2d2Buffer_(nullptr)
 
         // My changes
-        , convention_(convention) 
+        , conventions_(conventions) 
         , conventionIdx_(conventionIdx) 
         , conventionOverride_(conventionOverride) 
         , conventionFictitiousOverride_(false)
@@ -174,19 +175,20 @@ class R2D2Actor {
         , allColourPermutations_(allColourPermutations)
         , allInvColourPermutations_(allInvColourPermutations)
         , distShuffleColour_(distShuffleColour) 
-        , permutationDistribution_(permutationDistribution) {
-          if (beliefStats_ && convention_.size() > 0) {
-            auto responseMove = strToMove(convention_[conventionIdx_][0][1]);
+        , permutationDistribution_(permutationDistribution) 
+        , shuffleConvention_(shuffleConvention) {
+        if (beliefStats_ && conventions_.size() > 0) {
+            auto responseMove = strToMove(conventions_[conventionIdx_][1]);
             beliefStatsResponsePosition_ = responseMove.CardIndex();
-          }
-
-          if (sadLegacy_) {
-            showOwnCards_ = false;
-          } else {
-            showOwnCards_ = true;
-          }
         }
 
+        if (sadLegacy_) {
+            showOwnCards_ = false;
+        } else {
+            showOwnCards_ = true;
+        }
+    }
+    
     void setPartners(std::vector<std::shared_ptr<R2D2Actor>> partners) {
       partners_.reserve(partners.size());
       for (size_t i = 0; i < partners.size(); i++) {
@@ -239,6 +241,7 @@ class R2D2Actor {
     void pushToReplayBuffer();
     
     std::unordered_map<std::string, float> getStats() const { return stats_; }
+    rela::TensorDict getGameStory() const { return gameStory_; };
 
     int getConventionIndex() { return conventionIdx_; }
 
@@ -309,7 +312,7 @@ class R2D2Actor {
         std::vector<float> legalMoves);
     bool moveInVector(std::vector<hle::HanabiMove> moves, hle::HanabiMove move);
     std::tuple<hle::HanabiMove, bool> availableSignalMove( const HanabiEnv& env, 
-        std::vector<std::vector<std::string>> convention);
+        std::vector<std::vector<std::string>> conventions);
     hle::HanabiMove matchingResponseMove(
         std::vector<std::vector<std::string>> convention,
         hle::HanabiMove signalMove);
@@ -382,9 +385,10 @@ class R2D2Actor {
     int bothKnown_ = 0;
     int testVariable_ = 0;
 
+
     // My changes
     std::unordered_map<std::string,float> stats_;
-    std::vector<std::vector<std::vector<std::string>>> convention_;
+    std::vector<std::vector<std::string>> conventions_;
     int conventionIdx_;
     int conventionOverride_;
     bool conventionFictitiousOverride_;
@@ -430,4 +434,6 @@ class R2D2Actor {
     bool distShuffleColour_;
     std::vector<std::vector<float>> permutationDistribution_;
     std::vector<int> shuffleIndex_;
+    rela::TensorDict gameStory_;
+    bool shuffleConvention_;
 };

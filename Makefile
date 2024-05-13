@@ -18,6 +18,9 @@ build-plain:
 build-dev: 
 	docker build $(FLAGS) -t ${IMAGE}:dev -f dockerfiles/Dockerfile.projectnew --target dev .
 
+build-temp: 
+	docker build $(FLAGS) -t ${IMAGE}:temp -f dockerfiles/Dockerfile.projectnew --target dev .
+
 build-prod:
 	docker build $(FLAGS) -t ${IMAGE}:prod -f dockerfiles/Dockerfile.projectnew --target prod .
 

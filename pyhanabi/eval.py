@@ -21,6 +21,36 @@ import utils
 import gc
 import itertools
 
+# CARD_INDEX = {
+#     "R1": {"color_index": 0, "rank_index": 0},
+#     "R2": {"color_index": 0, "rank_index": 1},
+#     "R3": {"color_index": 0, "rank_index": 2},
+#     "R4": {"color_index": 0, "rank_index": 3},
+#     "R5": {"color_index": 0, "rank_index": 4},
+#     "Y1": {"color_index": 1, "rank_index": 0},
+#     "Y2": {"color_index": 1, "rank_index": 1},
+#     "Y3": {"color_index": 1, "rank_index": 2},
+#     "Y4": {"color_index": 1, "rank_index": 3},
+#     "Y5": {"color_index": 1, "rank_index": 4},
+#     "G1": {"color_index": 2, "rank_index": 0},
+#     "G2": {"color_index": 2, "rank_index": 1},
+#     "G3": {"color_index": 2, "rank_index": 2},
+#     "G4": {"color_index": 2, "rank_index": 3},
+#     "G5": {"color_index": 2, "rank_index": 4},
+#     "W1": {"color_index": 3, "rank_index": 0},
+#     "W2": {"color_index": 3, "rank_index": 1},
+#     "W3": {"color_index": 3, "rank_index": 2},
+#     "W4": {"color_index": 3, "rank_index": 3},
+#     "W5": {"color_index": 3, "rank_index": 4},
+#     "B1": {"color_index": 4, "rank_index": 0},
+#     "B2": {"color_index": 4, "rank_index": 1},
+#     "B3": {"color_index": 4, "rank_index": 2},
+#     "B4": {"color_index": 4, "rank_index": 3},
+#     "B5": {"color_index": 4, "rank_index": 4}
+# }
+
+# DECK_TEST_PATH = "jax_test_data/decks_test.json"
+
 def evaluate(
     agents,
     num_game,
@@ -48,6 +78,7 @@ def evaluate(
     dist_shuffle_colour=[0, 0], #distShuffleColor
     permutation_distribution=[],
     iterate_forced_shuffle_index=[0, 0],
+    shuffle_convention=[0, 0],
 ):
     """
     evaluate agents as long as they have a "act" function
@@ -83,6 +114,18 @@ def evaluate(
 
     games = create_envs(num_game, seed, num_player, bomb, max_len)
 
+    forced_decks = []
+    # deck_test_data = json.load(open(DECK_TEST_PATH))
+    # for deck_data in deck_test_data:
+    #     deck = list(reversed(deck_data["deck"]))
+    #     forced_decks.append([
+    #         hanalearn.HanabiCardValue(
+    #             CARD_INDEX[card]["color_index"],
+    #             CARD_INDEX[card]["rank_index"])
+    #         for card in deck
+    #     ])
+    # forced_decks = [forced_decks[9]]
+
     assert num_game % num_thread == 0
     game_per_thread = num_game // num_thread
     all_actors = []
@@ -92,7 +135,8 @@ def evaluate(
 
     colour_permutes, inverse_colour_permutes = get_colour_permutes()
 
-    forced_shuffle_index = [0] * len(partners)
+    if partners is not None:
+        forced_shuffle_index = [0] * len(partners)
 
     for t_idx in range(num_thread):
         thread_games = []
@@ -140,6 +184,7 @@ def evaluate(
                     permutation_distribution, #permutationDistribution
                     partner_idx, #partnerIdx
                     seed, #seed
+                    shuffle_convention[i] #shuffleConvention
                 )
 
                 if belief_stats:
@@ -187,7 +232,8 @@ def evaluate(
             elif convention_indexes is None and num_parameters > 0:
                 convention_index = (convention_index + 1) % num_parameters
 
-        thread = hanalearn.HanabiThreadLoop(thread_games, thread_actors, True, t_idx)
+        thread = hanalearn.HanabiThreadLoop(thread_games, thread_actors, 
+                                            True, t_idx, forced_decks)
         threads.append(thread)
         context.push_thread_loop(thread)
 
@@ -282,6 +328,7 @@ def evaluate_saved_model(
     iql_legacy=[0, 0],
     partner_model_type="train",
     shuffle_index=[-1, -1],
+    shuffle_convention_index=[-1, -1],
 ):
     if pre_loaded_data is None:
         pre_loaded_data = load_agents(
@@ -306,6 +353,7 @@ def evaluate_saved_model(
     partners = load_partner_agents(partner_models_path, partner_model_type, True)
 
     shuffle_colour = [1 if x >= 0 else 0 for x in shuffle_index]
+    shuffle_convention = [1 if x >= 0 else 0 for x in shuffle_convention_index]
 
     scores = []
     perfect = 0
@@ -330,6 +378,7 @@ def evaluate_saved_model(
             iql_legacy=iql_legacy,
             shuffle_colour=shuffle_colour,
             shuffle_constant_index=shuffle_index,
+            shuffle_convention=shuffle_convention
         )
         scores.extend(score)
         perfect += p

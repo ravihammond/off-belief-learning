@@ -51,7 +51,7 @@ def record_total_scores(stats, score, perfect, scores, stat_type):
     stats[f"{stat_type}bomb_out_rate"] = bomb_out_rate
 
 
-def calculate_scores(stats, conventions, convention_scores_stat_type):
+def calculate_scores(stats, conventions, convention_scores):
     for convention in conventions:
         scores = convention_scores[convention]
         if len(scores) == 0:

@@ -251,6 +251,7 @@ def load_agent(weight_file, overwrite):
     cfg["num_parameters"] = cfg["num_parameters"] if "num_parameters" in cfg else 0
 
     in_dim = game.feature_size(cfg["sad"])
+    out_dim = game.num_action()
     if cfg["parameterized"]:
         in_dim = tuple([x + cfg["num_parameters"] for x in in_dim])
 
